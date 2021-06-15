@@ -1,19 +1,24 @@
-#include <stdlib.h>
-#include <stdio.h>
 #include <libevdev/libevdev-uinput.h>
+#include <linux/input.h>
+#include <pthread.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <errno.h>
+#include <fcntl.h>
 
-void click(struct libevdev_uinput *dev)
-{
-  libevdev_uinput_write_event(dev, EV_KEY, BTN_LEFT, 1);
-  libevdev_uinput_write_event(dev, EV_SYN, SYN_REPORT, 0);
-  libevdev_uinput_write_event(dev, EV_KEY, BTN_LEFT, 0);
-  libevdev_uinput_write_event(dev, EV_SYN, SYN_REPORT, 0);
-}
+#include "read_key.c"
+#include "clicker.c"
+
+static int should_stop = 0;
+static int should_click = 0;
+
+void on_pressed(int code);
 
 int main()
 {
-  struct libevdev *dev;
   struct libevdev_uinput *uidev;
+  struct libevdev *dev;
 
   dev = libevdev_new();
   libevdev_set_name(dev, "Clicker");
@@ -26,17 +31,40 @@ int main()
   if (err != 0)
   {
     printf("Error: %i\n", err);
-    return err;
+    return 0;
   }
 
-  while(1)
+  pthread_t event_thread;
+  pthread_create(&event_thread, NULL, read_key_loop, (void *) on_pressed);
+
+  while(!should_stop)
   {
+    if(should_stop)
+      break;
+
     system("sleep 0.25");
-    click(uidev);
+
+    if(should_click)
+      click(uidev);
   }
 
   libevdev_uinput_destroy(uidev);
   printf("Goodbye!\n");
 
   return 0;
+}
+
+void on_pressed(int code)
+{
+  switch(code)
+  {
+    case 74:
+      should_stop = 1;
+      break;
+    case 78:
+      should_click = !should_click;
+      break;
+    default:
+      break;
+  }
 }
