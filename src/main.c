@@ -6,14 +6,18 @@
 #include <stdio.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <time.h>
 
 #include "read_key.c"
 #include "clicker.c"
 
 static int should_stop = 0;
 static int should_click = 0;
+static int delay = 100;
 
 void on_pressed(int code);
+
+void sleepms(long int ms);
 
 int main()
 {
@@ -42,7 +46,7 @@ int main()
     if(should_stop)
       break;
 
-    system("sleep 0.25");
+    sleepms(delay);
 
     if(should_click)
       click(uidev);
@@ -58,13 +62,34 @@ void on_pressed(int code)
 {
   switch(code)
   {
+    case 55:
+      should_click = !should_click;
+      break;
     case 74:
-      should_stop = 1;
+      delay += 10;
+      if(delay >= 10000) delay = 10000;
       break;
     case 78:
-      should_click = !should_click;
+      delay -= 10;
+      if(delay < 10) delay = 10;
+      break;
+    case 98:
+      should_stop = 1;
       break;
     default:
       break;
   }
+}
+
+void sleepms(long ms)
+{
+  struct timespec ts;
+  int res;
+
+  ts.tv_sec = ms / 1000;
+  ts.tv_nsec = (ms % 1000) * 1000000;
+
+  do {
+    res = nanosleep(&ts, &ts);
+  } while(res && errno == EINTR);
 }
